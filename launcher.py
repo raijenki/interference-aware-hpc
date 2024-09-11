@@ -58,8 +58,8 @@ def run(cpubind, memory, app):
     # Create a new directory for cgroups (error if bad)
     try:
         print("Creating groups in cgroups...")
-        os.makedirs(f"/sys/fs/cgroup/cpu/{CGROUP_NAME}", exist_ok=True)
-        os.makedirs(f"/sys/fs/cgroup/memory/{CGROUP_NAME}", exist_ok=True)
+        os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}", exist_ok=True)
+        #os.makedirs(f"/sys/fs/cgroup/memory/{CGROUP_NAME}", exist_ok=True)
     except OSError as error:
         print("Failure, exiting application...")
         print(error)
