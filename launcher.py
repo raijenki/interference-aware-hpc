@@ -26,14 +26,14 @@ def is_cgroupsv2_mounted():
 def run_app_and_pid(command):
     try:
         process = subprocess.Popen([command], shell=True)
-        return process.pid
+        return process
     except subprocess.CalledProcessError as e:
         print(f"Error running application: {e}")
         return None
 
 def mount_cgroup():
     try:
-        command = ["mount", "-t", "cgroup", "-o", "none,name=systemd", "cgroup", "/sys/fs/cgroup"]
+        command = ["sudo", "mount", "-t", "cgroup", "-o", "none,name=systemd", "cgroup", "/sys/fs/cgroup"]
         subprocess.run(command, check=True)
         print("Successfully mounted cgroup.")
     except subprocess.CalledProcessError as e:
@@ -81,17 +81,17 @@ def run(cpubind, memory, app):
     
     # Run application
     print(f"Running command: {app_command}")
-    pid = run_app_and_pid(app_command)
-    
-    # Put PID into the cgroups process
-    cgroups_command = (f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs")
-    os.system(cgroups_command)
+    process = run_app_and_pid(app_command)
+    if process:
+        pid = process.pid
 
-    # Wait PID to finish
-    running = True
-    while running == True:
-        running = check_pid(int(pid))
-        time.sleep(5)
+        # Put PID into the cgroups process
+        cgroups_command = (f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs")
+        os.system(cgroups_command)
+
+        # Wait process to finish
+        process.wait()
+        print(f"Process {pid} has finished.")
         
     cgroups_command = (f"> /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs")
     os.system(cgroups_command)
@@ -99,3 +99,5 @@ def run(cpubind, memory, app):
 
 if __name__ == '__main__':
     run()
+
+    
