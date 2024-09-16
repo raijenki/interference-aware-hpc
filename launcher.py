@@ -93,7 +93,8 @@ def run(cpubind, memory, app):
         pid = process.pid
 
         # Put PID into the cgroups process
-        cgroups_command = f"echo {pid} | sudo tee -a /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs > /dev/null"
+        os.makdirs()
+        cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.procs"
         os.system(cgroups_command)
 
         # Wait process to finish
@@ -101,7 +102,7 @@ def run(cpubind, memory, app):
         print(f"Process {pid} has finished.")
         process = False
         
-    cgroups_command = f"sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs > /dev/null"
+    cgroups_command = f"echo > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.procs"
     os.system(cgroups_command)
     print("Finished running application!")
 
