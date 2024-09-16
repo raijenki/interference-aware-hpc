@@ -6,6 +6,8 @@ import subprocess
 import os 
 import psutil 
 import time
+import uuid
+
 
 def check_pid(pid):
     if int(pid) in psutil.pids(): ## Check list of PIDs
@@ -48,7 +50,7 @@ def mount_cgroup():
 
 def run(cpubind, memory, app):
     """Simple program that runs an application in cgroupsv2 without interference."""
-    CGROUP_NAME ="interf"
+    CGROUP_NAME = uuid.uuid4()
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
@@ -67,18 +69,17 @@ def run(cpubind, memory, app):
     # Limit memory usage and CPU
     cpuquota = len(cpubind) * 100000
     cgroups_command = (
-        f"echo '+cpu +cpuset +memory +io +pids' | sudo tee /sys/fs/cgroup/cgroup.subtree_control > /dev/null "
-        f"echo '+cpu +cpuset +memory +io +pids' | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control > /dev/null "
-        f"&& echo {memory} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
-        f"&& echo {memory} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
-        f"&& echo \"{cpuquota} 100000\" | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpu.max > /dev/null"
+        f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control "
+        f"&& echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control "
+        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
+        f"&& echo \"{cpuquota} 100000\" > sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpu.max"
     )
 
     os.system(cgroups_command)
 
     # Apply CPU pinning if CPUs are provided
     if cpubind:
-        cgroups_command =  (f"&& echo {cpubind} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus > /dev/null ")
+        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus")
         os.system(cgroups_command)
         #app_command = f"numactl --physcpubind={cpubind} {app}"
     
@@ -98,6 +99,7 @@ def run(cpubind, memory, app):
         # Wait process to finish
         process.wait()
         print(f"Process {pid} has finished.")
+        process = False
         
     cgroups_command = f"sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs > /dev/null"
     os.system(cgroups_command)
