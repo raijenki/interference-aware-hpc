@@ -51,6 +51,7 @@ def mount_cgroup():
 def run(cpubind, memory, app):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
+    SUBGROUP_NAME = uuid.uuid1()
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
@@ -71,7 +72,7 @@ def run(cpubind, memory, app):
     cgroups_command = (
         f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control "
         f"&& echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control "
-        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
+        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max"
         f"&& echo \"{cpuquota} 100000\" > sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpu.max"
     )
 
@@ -93,8 +94,8 @@ def run(cpubind, memory, app):
         pid = process.pid
 
         # Put PID into the cgroups process
-        os.makdirs()
-        cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.procs"
+        print(cgroups_command)
+        cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
         os.system(cgroups_command)
 
         # Wait process to finish
@@ -102,7 +103,7 @@ def run(cpubind, memory, app):
         print(f"Process {pid} has finished.")
         process = False
         
-    cgroups_command = f"echo > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.procs"
+    #cgroups_command = f"echo > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
     os.system(cgroups_command)
     print("Finished running application!")
 
