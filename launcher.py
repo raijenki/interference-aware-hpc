@@ -7,7 +7,8 @@ import os
 import psutil 
 import time
 import uuid
-
+import importlib.util
+import apt
 
 def check_pid(pid):
     if int(pid) in psutil.pids(): ## Check list of PIDs
@@ -42,6 +43,26 @@ def mount_cgroup():
         print(f"Failed to mount cgroup: {e}")
         exit()
 
+def sanity_check():
+    # Python packages
+    packages = ['psutil', 'click', 'apt']
+
+    for package in packages:
+        package = importlib.util.find_spec(package)
+        if package is None:
+            print(package +" is not installed")
+            sys.exit(1)
+    
+    # APT packages (only one so far)
+    package = "numactl"
+    cache = apt.Cache()
+    if not package in cache:
+        print(package +" is not installed")
+        sys.exit(1)
+    
+    return 0
+
+
 def app_run(app):
     if app == 'stream':
         # Check if there's a stream_c in the /apps/stream folder
@@ -54,17 +75,27 @@ def app_run(app):
 
 @click.command()
 @click.option('--ncpus', required=True, help='Number of CPUs to be allocated')
-@click.option('--cpubind', help='Which CPU(s) the application should be executed.')
-@click.option('--memory', help='Allocate amount of memory to the application.')
-@click.option('--app', required=True, prompt='Application',
-              help='The application file you wish to execute.')
-
-def run(ncpus, cpubind, memory, app):
+@click.option('--cpubind', required=True, help='Which CPU(s) the application should be executed.')
+@click.option('--memory', required=True, help='Allocate amount of memory to the application.')
+@click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
+@click.option('--cpufreq', prompt='Minimum and Minimum Frequencies for CPUs') # cpupower 
+              
+def run(ncpus, cpubind, memory, app, cpufreq):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
 
+    # Check requisites (numactl, cpupower)
+    sanity_check()
+    # Check if applications are compiled 
     app = app_run(app)
+
+    if cpufreq:
+        minfreq, maxfreq = cpufreq
+        # Set governor to userspace, set frequencies
+        print(f"Setting processor frequencies to {minfreq} and {maxfreq}...")
+        os.system(f"cpupower frequency-set -g userspace")
+        os.system(f"cpupower frequency-set -d {minfreq} -u {maxfreq}")
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
