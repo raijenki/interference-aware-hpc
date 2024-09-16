@@ -42,16 +42,29 @@ def mount_cgroup():
         print(f"Failed to mount cgroup: {e}")
         exit()
 
+def app_run(app):
+    if app == 'stream':
+        # Check if there's a stream_c in the /apps/stream folder
+        if os.path.isfile("./apps/stream/stream_c"):
+            return "./apps/stream/stream_c"
+        else: 
+            # App doesn't exist
+            print("Application not found, make sure it exists by running 'make' in the rootdir, exiting...")
+            sys.exit(1)
+
 @click.command()
+@click.option('--ncpus', required=True, help='Number of CPUs to be allocated')
 @click.option('--cpubind', help='Which CPU(s) the application should be executed.')
 @click.option('--memory', help='Allocate amount of memory to the application.')
 @click.option('--app', required=True, prompt='Application',
               help='The application file you wish to execute.')
 
-def run(cpubind, memory, app):
+def run(ncpus, cpubind, memory, app):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
+
+    app = app_run(app)
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
@@ -68,25 +81,26 @@ def run(cpubind, memory, app):
         sys.exit(1)
 
     # Limit memory usage and CPU
-    cpuquota = len(cpubind) * 100000
-    cgroups_command = (
-        f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control "
-        f"&& echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.subtree_control "
-        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/memory.max"
-        f"&& echo \"{cpuquota} 100000\" > sudo tee /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cpu.max"
-    )
+    cpuquota = ncpus * 100000
+    cgroups_subtree = (f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control")
+    cgroups_cpu_max = (f"echo \"{cpuquota} 100000\" > /sys/fs/cgroup/{CGROUP_NAME}/cpu.max")
+    os.system(cgroups_subtree)
+    os.system(cgroups_cpu_max)
 
-    os.system(cgroups_command)
+    if memory:
+        cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
+        os.system(cgroups_memory_max)
 
     # Apply CPU pinning if CPUs are provided
     if cpubind:
-        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cpuset.cpus")
+        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus")
         os.system(cgroups_command)
         app_command = f"numactl --physcpubind={cpubind} {app}"
     else:
         app_command = app
     
     # Run application
+    start = time.time()
     print(f"Running command: {app_command}")
     process = run_app_and_pid(app_command)
 
@@ -102,12 +116,8 @@ def run(cpubind, memory, app):
         process.wait()
         print(f"Process {pid} has finished.")
         process = False
-        
-    #cgroups_command = f"echo > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
-    os.system(cgroups_command)
-    print("Finished running application!")
+    end = time.time()
+    print("Finished running application, time = " + str(float(end-start)) + " seconds!")
 
 if __name__ == '__main__':
     run()
-
-    
