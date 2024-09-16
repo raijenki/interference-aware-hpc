@@ -61,7 +61,7 @@ def run(cpubind, memory, app):
     # Create a new directory for cgroups (error if bad)
     try:
         print("Creating groups in cgroups...")
-        os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}", exist_ok=True)
+        os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}", exist_ok=True)
     except OSError as error:
         print("Failure, exiting application...")
         print(error)
@@ -71,20 +71,20 @@ def run(cpubind, memory, app):
     cpuquota = len(cpubind) * 100000
     cgroups_command = (
         f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control "
-        f"&& echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control "
-        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max"
-        f"&& echo \"{cpuquota} 100000\" > sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpu.max"
+        f"&& echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.subtree_control "
+        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/memory.max"
+        f"&& echo \"{cpuquota} 100000\" > sudo tee /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cpu.max"
     )
 
     os.system(cgroups_command)
 
     # Apply CPU pinning if CPUs are provided
     if cpubind:
-        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus")
+        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cpuset.cpus")
         os.system(cgroups_command)
-        #app_command = f"numactl --physcpubind={cpubind} {app}"
-    
-    app_command = app
+        app_command = f"numactl --physcpubind={cpubind} {app}"
+    else:
+        app_command = app
     
     # Run application
     print(f"Running command: {app_command}")
