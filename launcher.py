@@ -10,6 +10,8 @@ import uuid
 import importlib.util
 import apt
 
+
+
 def check_pid(pid):
     if int(pid) in psutil.pids(): ## Check list of PIDs
         return True 
@@ -74,12 +76,15 @@ def app_run(app):
             sys.exit(1)
 
 @click.command()
-@click.option('--ncpus', required=True, help='Number of CPUs to be allocated')
-@click.option('--cpubind', required=True, help='Which CPU(s) the application should be executed.')
-@click.option('--memory', required=True, help='Allocate amount of memory to the application.')
+@click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated')
+@click.option('--cpubind', required=True, default=0, help='Which CPU(s) the application should be executed.')
+@click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application.')
 @click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
-@click.option('--cpufreq', prompt='Minimum and Minimum Frequencies for CPUs') # cpupower 
-              
+@click.option('--cpufreq', nargs=2, default=[], prompt='Minimum and Minimum Frequencies for CPUs') # cpupower 
+#@click.option('--collect-energy', prompt='0/1', help='The application file you wish to execute.')
+#cat /sys/class/powercap/intel-rapl/intel-rapl\:0/energy_uj
+# resctrl
+
 def run(ncpus, cpubind, memory, app, cpufreq):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
@@ -112,12 +117,12 @@ def run(ncpus, cpubind, memory, app, cpufreq):
         sys.exit(1)
 
     # Limit memory usage and CPU
-    cpuquota = ncpus * 100000
+    cpuquota = int(ncpus) * 100000
     cgroups_subtree = (f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control")
     cgroups_cpu_max = (f"echo \"{cpuquota} 100000\" > /sys/fs/cgroup/{CGROUP_NAME}/cpu.max")
     os.system(cgroups_subtree)
     os.system(cgroups_cpu_max)
-
+    
     if memory:
         cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
         os.system(cgroups_memory_max)

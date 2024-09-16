@@ -11,9 +11,19 @@
 * InfluxDB for data collection
 * Python3 and packages click, psutils
 * numactl
+* cpupower
+For cpupower to work properly, you need to setup your GRUB start as:
+```
+GRUB_CMDLINE_LINUX_DEFAULT="intel_pstate=passive intel_pstate=no_hwp acpi=force" 
+```
+
 
 ## How to use?
-To run the application:
+The basic run is:
 ```
-sudo python3 launcher.py --cpubind [CPUIDs] --memory [AMOUNT] --app [DIRECTORY]
+sudo python3 launcher.py --ncpus [n] --cpubind [CPUIDs] --memory [AMOUNT] --app [APPLICATION]
 ```
+
+Other flags:
+* ```--cpufreq [MIN] [MAX]``` sets up different frequencies
+* ```--collect-energy [CORE]``` displays energy differences at the end
