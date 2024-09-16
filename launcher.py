@@ -33,7 +33,7 @@ def run_app_and_pid(command):
 
 def mount_cgroup():
     try:
-        command = ["sudo", "mount", "-t", "cgroup", "-o", "none,name=systemd", "cgroup", "/sys/fs/cgroup"]
+        command = ["mount", "-t", "cgroup2", "-o", "none,name=systemd", "cgroup", "/sys/fs/cgroup"]
         subprocess.run(command, check=True)
         print("Successfully mounted cgroup.")
     except subprocess.CalledProcessError as e:
@@ -48,7 +48,7 @@ def mount_cgroup():
 
 def run(cpubind, memory, app):
     """Simple program that runs an application in cgroupsv2 without interference."""
-    CGROUP_NAME ="nointerf"
+    CGROUP_NAME ="interf"
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
@@ -59,7 +59,6 @@ def run(cpubind, memory, app):
     try:
         print("Creating groups in cgroups...")
         os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}", exist_ok=True)
-        #os.makedirs(f"/sys/fs/cgroup/memory/{CGROUP_NAME}", exist_ok=True)
     except OSError as error:
         print("Failure, exiting application...")
         print(error)
@@ -68,32 +67,39 @@ def run(cpubind, memory, app):
     # Limit memory usage and CPU
     cpuquota = len(cpubind) * 100000
     cgroups_command = (
-        f"echo '+cpu +memory -io' > /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control "
-        f"&& echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max "
-        f"&& echo \"{cpuquota} 100000\" > /sys/fs/cgroup/{CGROUP_NAME}/cpu.max"
+        f"echo '+cpu +cpuset +memory +io +pids' | sudo tee /sys/fs/cgroup/cgroup.subtree_control > /dev/null "
+        f"echo '+cpu +cpuset +memory +io +pids' | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cgroup.subtree_control > /dev/null "
+        f"&& echo {memory} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
+        f"&& echo {memory} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/memory.max > /dev/null "
+        f"&& echo \"{cpuquota} 100000\" | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpu.max > /dev/null"
     )
-    os.system(cgroups_command)    
+
+    os.system(cgroups_command)
+
     # Apply CPU pinning if CPUs are provided
     if cpubind:
-        app_command = f"numactl --physcpubind={cpubind} {app}"
-    else:
-        app_command = app
+        cgroups_command =  (f"&& echo {cpubind} | sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus > /dev/null ")
+        os.system(cgroups_command)
+        #app_command = f"numactl --physcpubind={cpubind} {app}"
+    
+    app_command = app
     
     # Run application
     print(f"Running command: {app_command}")
     process = run_app_and_pid(app_command)
+
     if process:
         pid = process.pid
 
         # Put PID into the cgroups process
-        cgroups_command = (f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs")
+        cgroups_command = f"echo {pid} | sudo tee -a /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs > /dev/null"
         os.system(cgroups_command)
 
         # Wait process to finish
         process.wait()
         print(f"Process {pid} has finished.")
         
-    cgroups_command = (f"> /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs")
+    cgroups_command = f"sudo tee /sys/fs/cgroup/{CGROUP_NAME}/cgroups.procs > /dev/null"
     os.system(cgroups_command)
     print("Finished running application!")
 
