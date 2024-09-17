@@ -56,11 +56,12 @@ def sanity_check():
             sys.exit(1)
     
     # APT packages (only one so far)
-    package = "numactl"
+    package = ["intel-cmt-cat", "numactl"]
     cache = apt.Cache()
-    if not package in cache:
-        print(package +" is not installed")
-        sys.exit(1)
+    for package in packages:
+        if not package in cache:
+            print(package +" is not installed")
+            sys.exit(1)
     
     return 0
 
@@ -76,31 +77,32 @@ def app_run(app):
             sys.exit(1)
 
 @click.command()
-@click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated')
-@click.option('--cpubind', required=True, default=0, help='Which CPU(s) the application should be executed.')
-@click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application.')
+@click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
+@click.option('--cpubind/--no-cpu-bind', default=False, help='Which CPU(s) the application should be executed (numactl).')
+@click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
 @click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
-@click.option('--cpufreq', nargs=2, default=[], prompt='Minimum and Minimum Frequencies for CPUs') # cpupower 
-#@click.option('--collect-energy', prompt='0/1', help='The application file you wish to execute.')
+@click.option('--disk/--no-disk-throttle', type=(str, int) default=False, prompt='Disk bandwidth (device, amount of MB/s)', help='Limits the disk bandwidth.')
+@click.option('--cpufreq/--no-cpufreq', default=False, prompt='Frequency for CPU')    
+@click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
 #cat /sys/class/powercap/intel-rapl/intel-rapl\:0/energy_uj
 # resctrl
 
-def run(ncpus, cpubind, memory, app, cpufreq):
+def run(ncpus, cpubind, memory, app, disk, cpufreq):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
 
     # Check requisites (numactl, cpupower)
     sanity_check()
+
     # Check if applications are compiled 
     app = app_run(app)
 
     if cpufreq:
-        minfreq, maxfreq = cpufreq
         # Set governor to userspace, set frequencies
-        print(f"Setting processor frequencies to {minfreq} and {maxfreq}...")
+        print(f"Setting processor frequencies to {cpufreq}...")
         os.system(f"cpupower frequency-set -g userspace")
-        os.system(f"cpupower frequency-set -d {minfreq} -u {maxfreq}")
+        os.system(f"cpupower frequency-set -f {cpufreq}")
 
     # Check if cgroupv2 is mounted in the system
     if not is_cgroupsv2_mounted():
@@ -126,6 +128,12 @@ def run(ncpus, cpubind, memory, app, cpufreq):
     if memory:
         cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
         os.system(cgroups_memory_max)
+
+    if disk: 
+        id, throughput = disk
+        throughput_bytes = throughput * 1024 * 1024
+        cgroups_io_max = (f"echo {id} rbps={throughput_bytes} > /sys/fs/cgroup/{CGROUP_NAME}/io.max")
+        os.system(cgroups_io_max)
 
     # Apply CPU pinning if CPUs are provided
     if cpubind:
@@ -154,6 +162,9 @@ def run(ncpus, cpubind, memory, app, cpufreq):
         process = False
     end = time.time()
     print("Finished running application, time = " + str(float(end-start)) + " seconds!")
+
+    # Cleanup intel cat
+    os.system("pqos -R")
 
 if __name__ == '__main__':
     run()
