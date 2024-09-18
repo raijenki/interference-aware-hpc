@@ -68,7 +68,7 @@ def app_run(app):
             sys.exit(1)
 
 def read_energy_socket(socket_id):
-    f = open("/sys/class/powercap/intel-rapl/intel-rapl\:{socket_id}/energy_uj", "r")
+    f = open(f"/sys/class/powercap/intel-rapl/intel-rapl\:{socket_id}/energy_uj", "r")
     return f.read()
     
 
@@ -121,12 +121,10 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
     os.system(cgroups_cpu_max)
     
     if memory:
-        print("memory")
         cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
         os.system(cgroups_memory_max)
 
     if disk: 
-        print("disk")
         id, throughput = disk
         throughput_bytes = throughput * 1024 * 1024
         cgroups_io_max = (f"echo {id} rbps={throughput_bytes} > /sys/fs/cgroup/{CGROUP_NAME}/io.max")
@@ -168,8 +166,8 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
         socket1_energy_end = read_energy_socket(1)
     print("Finished running application, time = " + str(float(end-start)) + " seconds!")
 
-    energy0 = socket0_energy_end - socket0_energy_start
-    energy1 = socket1_energy_end - socket1_energy_start
+    energy0 = int(socket0_energy_end) - int(socket0_energy_start)
+    energy1 = int(socket1_energy_end) - int(socket1_energy_start)
 
     # Log whatever we need
     if logging:
