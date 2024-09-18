@@ -76,6 +76,11 @@ def app_run(app):
             print("Application not found, make sure it exists by running 'make' in the rootdir, exiting...")
             sys.exit(1)
 
+def read_energy_socket(socket_id):
+    f = open("/sys/class/powercap/intel-rapl/intel-rapl\:{socket_id}/energy_uj", "r")
+    return f.read()
+    
+
 @click.command()
 @click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
 @click.option('--cpubind/--no-cpu-bind', default=False, help='Which CPU(s) the application should be executed (numactl).')
@@ -84,10 +89,11 @@ def app_run(app):
 @click.option('--disk/--no-disk-throttle', type=(str, int) default=False, prompt='Disk bandwidth (device, amount of MB/s)', help='Limits the disk bandwidth.')
 @click.option('--cpufreq/--no-cpufreq', default=False, prompt='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
+@click.option('--rapl/--no-rapl', default=False, help='Measure energy using RAPL.')
 #cat /sys/class/powercap/intel-rapl/intel-rapl\:0/energy_uj
 # resctrl
 
-def run(ncpus, cpubind, memory, app, disk, cpufreq):
+def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
@@ -145,6 +151,11 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq):
     
     # Run application
     start = time.time()
+
+    if rapl:
+        socket0_energy_start = read_energy_socket(0)
+        socket1_energy_start = read_energy_socket(1)
+
     print(f"Running command: {app_command}")
     process = run_app_and_pid(app_command)
 
@@ -161,8 +172,29 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq):
         print(f"Process {pid} has finished.")
         process = False
     end = time.time()
+    if rapl:
+        socket0_energy_end = read_energy_socket(0)
+        socket1_energy_end = read_energy_socket(1)
     print("Finished running application, time = " + str(float(end-start)) + " seconds!")
 
+    energy0 = socket0_energy_end - socket0_energy_start
+    energy1 = socket1_energy_end - socket1_energy_start
+
+    # Log whatever we need
+    if logging:
+        if os.path.isfile("logs.txt"):
+            f = open("demofile2.txt", "w")
+            if rapl:
+                f.write("app,runtime,energy0,energy1")
+            else:
+                f.write("app,runtime")
+        else:
+            f = open("demofile2.txt", "a")
+            if rapl:
+                f.write(f"{app},{end},{energy0},{energy1}")
+            else:
+                f.write(f"{app},{end}")
+        f.close()
     # Cleanup intel cat
     os.system("pqos -R")
 
