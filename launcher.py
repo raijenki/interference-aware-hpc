@@ -46,17 +46,8 @@ def mount_cgroup():
         exit()
 
 def sanity_check():
-    # Python packages
-    packages = ['psutil', 'click', 'apt']
 
-    for package in packages:
-        package = importlib.util.find_spec(package)
-        if package is None:
-            print(package +" is not installed")
-            sys.exit(1)
-    
-    # APT packages (only one so far)
-    package = ["intel-cmt-cat", "numactl"]
+    packages = ["intel-cmt-cat", "numactl"]
     cache = apt.Cache()
     for package in packages:
         if not package in cache:
@@ -86,12 +77,10 @@ def read_energy_socket(socket_id):
 @click.option('--cpubind/--no-cpu-bind', default=False, help='Which CPU(s) the application should be executed (numactl).')
 @click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
 @click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
-@click.option('--disk/--no-disk-throttle', type=(str, int) default=False, prompt='Disk bandwidth (device, amount of MB/s)', help='Limits the disk bandwidth.')
+@click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
 @click.option('--cpufreq/--no-cpufreq', default=False, prompt='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
 @click.option('--rapl/--no-rapl', default=False, help='Measure energy using RAPL.')
-#cat /sys/class/powercap/intel-rapl/intel-rapl\:0/energy_uj
-# resctrl
 
 def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
     """Simple program that runs an application in cgroupsv2 without interference."""
@@ -132,10 +121,12 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
     os.system(cgroups_cpu_max)
     
     if memory:
+        print("memory")
         cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
         os.system(cgroups_memory_max)
 
     if disk: 
+        print("disk")
         id, throughput = disk
         throughput_bytes = throughput * 1024 * 1024
         cgroups_io_max = (f"echo {id} rbps={throughput_bytes} > /sys/fs/cgroup/{CGROUP_NAME}/io.max")
@@ -163,8 +154,8 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
         pid = process.pid
 
         # Put PID into the cgroups process
-        print(cgroups_command)
         cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
+        print(cgroups_command)
         os.system(cgroups_command)
 
         # Wait process to finish
@@ -195,6 +186,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
             else:
                 f.write(f"{app},{end}")
         f.close()
+
     # Cleanup intel cat
     os.system("pqos -R")
 
