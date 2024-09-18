@@ -157,9 +157,9 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
     if llcisolation:
         print("Isolating application...")
         # Set the COS bitmasks for COS1 using 50% and COS2 using 30% of cache, cores in COS0 uses the remainder
-        os.command("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
+        os.system("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
         # Associate each COS with the cores where each app is running
-        os.command(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={get_remaining_cores(cpubind)}\"")
+        os.system(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={get_remaining_cores(cpubind)}\"")
 
     # Run application
     start = time.time()
@@ -207,8 +207,10 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
                 f.write(f"{app},{end}")
         f.close()
 
-    # Cleanup intel cat
+    # Cleanup intel cat and cgroup
     os.system("pqos -R")
+    os.system(f"rmdir /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}")
+    os.system(f"rmdir /sys/fs/cgroup/{CGROUP_NAME}")
 
 if __name__ == '__main__':
     run()
