@@ -21,9 +21,5 @@ GRUB_CMDLINE_LINUX_DEFAULT="intel_pstate=passive intel_pstate=no_hwp acpi=force"
 ## How to use?
 The basic run is:
 ```
-sudo python3 launcher.py --ncpus [n] --cpubind [CPUIDs] --memory [AMOUNT] --app [APPLICATION]
+sudo python3 launcher.py --app stream --ncpus 8 --cpubind 0,2,4,6,8,10,12,14 --memory 20G --disk 8:0 20 --cpufreq 3000MHz --logging --rapl
 ```
-
-Other flags:
-* ```--cpufreq [MIN] [MAX]``` sets up different frequencies
-* ```--collect-energy [CORE]``` displays energy differences at the end

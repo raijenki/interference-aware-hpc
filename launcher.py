@@ -10,6 +10,21 @@ import uuid
 import importlib.util
 import apt
 
+def get_remaining_cores(used_cores):
+    total_cores = set(range(128))
+    
+    # Convert used cores to a set (supports individual numbers and ranges)
+    used_set = set()
+    for item in used_cores:
+        if isinstance(item, int):
+            used_set.add(item)
+        elif isinstance(item, str) and '-' in item:
+            start, end = map(int, item.split('-'))
+            used_set.update(range(start, end + 1))
+    
+    # Remaining cores are the difference between all cores and used cores
+    remaining_cores = total_cores - used_set
+    return sorted(remaining_cores)
 
 
 def check_pid(pid):
@@ -80,9 +95,10 @@ def read_energy_socket(socket_id):
 @click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
 @click.option('--cpufreq', prompt='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
+@click.option('--llcisolation/--no-llc-isolation', default=False, help='If you want to log the results or not.')
 @click.option('--rapl/--no-rapl', default=False, help='Measure energy using RAPL.')
 
-def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
+def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
@@ -138,6 +154,13 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, rapl):
     else:
         app_command = app_path
     
+    if llcisolation:
+        print("Isolating application...")
+        # Set the COS bitmasks for COS1 using 50% and COS2 using 30% of cache, cores in COS0 uses the remainder
+        os.command("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
+        # Associate each COS with the cores where each app is running
+        os.command(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={get_remaining_cores(cpubind)}\"")
+
     # Run application
     start = time.time()
 
