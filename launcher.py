@@ -74,11 +74,11 @@ def read_energy_socket(socket_id):
 
 @click.command()
 @click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
-@click.option('--cpubind/--no-cpu-bind', default=False, help='Which CPU(s) the application should be executed (numactl).')
+@click.option('--cpubind/--no-cpu-bind', required=True, help='Which CPU(s) the application should be executed (numactl).')
 @click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
 @click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
 @click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
-@click.option('--cpufreq/--no-cpufreq', default=False, prompt='Frequency for CPU')    
+@click.option('--cpufreq/--no-cpufreq', prompt='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
 @click.option('--rapl/--no-rapl', default=False, help='Measure energy using RAPL.')
 
