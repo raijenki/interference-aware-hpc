@@ -10,4 +10,4 @@ mt-dgemm: mt-dgemm.c
 	$(CC) $(CFLAGS) -std=c++11 -ffast-math -mavx2 -fopenmp -DUSE_CBLAS -o viruses/cpu/mt-dgemm viruses/cpu/mt-dgemm.c -lopenblas
 
 clean:
-	rm -f apps/stream/stream_c apps/stream/stream.c*.o
+	rm -f apps/stream/stream_c apps/stream/stream.c*.o viruses/cpu/mt-dgemm *.o
