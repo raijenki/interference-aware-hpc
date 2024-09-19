@@ -12,7 +12,7 @@ import apt
 
 def get_remaining_cores(used_cores):
     total_cores = set(range(128))
-    
+
     # Convert used cores to a set (supports individual numbers and ranges)
     used_set = set()
     for item in used_cores:
@@ -24,7 +24,10 @@ def get_remaining_cores(used_cores):
     
     # Remaining cores are the difference between all cores and used cores
     remaining_cores = total_cores - used_set
-    return sorted(remaining_cores)
+    sorted_cores = sorted(remaining_cores)
+    string_cores = ','.join(map(sorted_cores))
+    print(f"{used_cores} AND {string_cores}") # Sanity check
+    return string_cores
 
 
 def check_pid(pid):
@@ -159,7 +162,9 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         # Set the COS bitmasks for COS1 using 50% and COS2 using 30% of cache, cores in COS0 uses the remainder
         os.system("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
         # Associate each COS with the cores where each app is running
-        os.system(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={get_remaining_cores(cpubind)}\"")
+        cpu_split = [eval(i) for i in cpubind.split(",")]
+        remainder_cores = get_remaining_cores(cpu_split)
+        os.system(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={remainder_cores}\"")
 
     # Run application
     start = time.time()
@@ -194,17 +199,17 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
     # Log whatever we need
     if logging:
         if os.path.isfile("logs.txt"):
-            f = open("demofile2.txt", "w")
+            f = open("logs.txt", "w")
             if rapl:
-                f.write("app,runtime,energy0,energy1")
+                f.write("app,runtime,energy0,energy1\n")
             else:
-                f.write("app,runtime")
+                f.write("app,runtime\n")
         else:
-            f = open("demofile2.txt", "a")
+            f = open("logs.txt", "a")
             if rapl:
-                f.write(f"{app},{end},{energy0},{energy1}")
+                f.write(f"{app},{end},{energy0},{energy1}\n")
             else:
-                f.write(f"{app},{end}")
+                f.write(f"{app},{end}\n")
         f.close()
 
     # Cleanup intel cat and cgroup
