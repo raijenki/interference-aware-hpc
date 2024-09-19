@@ -204,12 +204,13 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
                 f.write("app,runtime,energy0,energy1\n")
             else:
                 f.write("app,runtime\n")
+            f.close()
+            
+        f = open("logs.txt", "a")
+        if rapl:
+            f.write(f"{app},{end},{energy0},{energy1}\n")
         else:
-            f = open("logs.txt", "a")
-            if rapl:
-                f.write(f"{app},{end},{energy0},{energy1}\n")
-            else:
-                f.write(f"{app},{end}\n")
+            f.write(f"{app},{end}\n")
         f.close()
 
     # Cleanup intel cat and cgroup
