@@ -178,7 +178,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         cpu_split = [eval(i) for i in cpubind.split(",")]
         interf_cores = [24,25,26,27,28,29,30]
         remainder_cores, interf_cores = get_remaining_cores(cpu_split, interf_cores)
-        os.system(f"pqos -a \"llc:0={cpubind};llc:1={interf_cores}};llc:2={remainder_cores}\"")
+        os.system(f"pqos -a \"llc:0={cpubind};llc:1={interf_cores};llc:2={remainder_cores}\"")
 
     # Run application
     start = time.time()
