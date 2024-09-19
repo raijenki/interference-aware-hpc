@@ -10,11 +10,13 @@ import uuid
 import importlib.util
 import apt
 
-def get_remaining_cores(used_cores):
+def get_remaining_cores(used_cores, interf_cores):
     total_cores = set(range(128))
 
     # Convert used cores to a set (supports individual numbers and ranges)
     used_set = set()
+    interf_set = set()
+
     for item in used_cores:
         if isinstance(item, int):
             used_set.add(item)
@@ -22,12 +24,23 @@ def get_remaining_cores(used_cores):
             start, end = map(int, item.split('-'))
             used_set.update(range(start, end + 1))
     
-    # Remaining cores are the difference between all cores and used cores
-    remaining_cores = total_cores - used_set
+    for item in interf_cores:
+        if isinstance(item, int):
+            interf_set.add(item)
+        elif isinstance(item, str) and '-' in item:
+            start, end = map(int, item.split('-'))
+            interf_set.update(range(start, end + 1))
+    
+    # Remaining cores are the difference between all cores, used cores and interference cores
+    remaining_cores = total_cores - used_set - interf_set
     sorted_cores = sorted(remaining_cores)
     string_cores = ','.join(map(str, sorted_cores))
+
+    sorted_interf_cores = sorted(interf_cores)
+    string_interf_cores = ','.join(map(str, sorted_interf_cores))
+
     #print(f"{used_cores} AND {string_cores}") # Sanity check
-    return string_cores
+    return string_cores, string_interf_cores
 
 
 def check_pid(pid):
@@ -163,8 +176,9 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         os.system("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
         # Associate each COS with the cores where each app is running
         cpu_split = [eval(i) for i in cpubind.split(",")]
-        remainder_cores = get_remaining_cores(cpu_split)
-        os.system(f"pqos -a \"llc:0={cpubind};llc:1=24-30;llc:2={remainder_cores}\"")
+        interf_cores = [24,25,26,27,28,29,30]
+        remainder_cores, interf_cores = get_remaining_cores(cpu_split, interf_cores)
+        os.system(f"pqos -a \"llc:0={cpubind};llc:1={interf_cores}};llc:2={remainder_cores}\"")
 
     # Run application
     start = time.time()
@@ -192,7 +206,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         socket0_energy_end = read_energy_socket(0)
         socket1_energy_end = read_energy_socket(1)
     print("Finished running application, time = " + str(float(end-start)) + " seconds!")
-
+    exec_time = end - start
     energy0 = int(socket0_energy_end) - int(socket0_energy_start)
     energy1 = int(socket1_energy_end) - int(socket1_energy_start)
 
@@ -205,12 +219,12 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
             else:
                 f.write("app,runtime\n")
             f.close()
-            
+
         f = open("logs.txt", "a")
         if rapl:
-            f.write(f"{app},{end},{energy0},{energy1}\n")
+            f.write(f"{app},{exec_time},{energy0},{energy1}\n")
         else:
-            f.write(f"{app},{end}\n")
+            f.write(f"{app},{exec_time}\n")
         f.close()
 
     # Cleanup intel cat and cgroup
