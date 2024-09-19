@@ -10,7 +10,7 @@ import uuid
 import importlib.util
 import apt
 
-def get_remaining_cores(used_cores):
+def get_remaining_cores(used_cores, interf_cores):
     total_cores = set(range(128))
 
     # Convert used cores to a set (supports individual numbers and ranges)
@@ -135,7 +135,7 @@ def create_cgroups(CGROUP_NAME, SUBGROUP_NAME, ncpus, memory, disk, cpubind):
 @click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
 @click.option('--cpubind', required=True, help='Which CPU(s) the application should be executed (numactl).')
 @click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
-@click.option('--app', type=click.Choice(['stream'], required=True, prompt='Application', help='The application file you wish to execute.')
+@click.option('--app', type=click.Choice(['stream']), required=True, prompt='Application', help='The application file you wish to execute.')
 @click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
 @click.option('--cpufreq', is_flag=False, help='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
@@ -151,15 +151,17 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
     # This data is for the isolation study
     if interf is not None:
         interf_cores = [1,3,5,7,9,11,13]
-        ncpus_interf = 
+        ncpus_interf = 8
         memory_interf = memory
         disk_interf = disk
         CGROUP_INTERF_NAME = uuid.uuid4()
         SUBGROUP_NAMECGROUP_INTERF_NAME = uuid.uuid1()
         if interf == 'CPU':
-            interf_path = "/viruses/CPU/mt-dgemm"
             matrix_size = 200
-            rep = 100
+            reps = 100
+            interf_path = "/viruses/CPU/mt-dgemm " + str(matrix_size) + " " + str(reps)
+        else:
+            interf_path = "sleep 10"
    
     cpu_split = [eval(i) for i in cpubind.split(",")]
     remainder_cores, interf_cores = get_remaining_cores(cpu_split, interf_cores)
@@ -216,6 +218,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
         socket1_energy_start = read_energy_socket(1)
 
     process = run_app_and_pid(app_command)
+    process_interf = run_app_and_pid(interf_command)
 
     if process:
         pid = process.pid
