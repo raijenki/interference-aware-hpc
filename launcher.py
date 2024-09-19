@@ -10,7 +10,7 @@ import uuid
 import importlib.util
 import apt
 
-def get_remaining_cores(used_cores, interf_cores):
+def get_remaining_cores(used_cores):
     total_cores = set(range(128))
 
     # Convert used cores to a set (supports individual numbers and ranges)
@@ -102,31 +102,76 @@ def read_energy_socket(socket_id):
     f = open(f"/sys/class/powercap/intel-rapl/intel-rapl:{socket_id}/energy_uj", "r")
     return f.read()
     
+def create_cgroups(CGROUP_NAME, SUBGROUP_NAME, ncpus, memory, disk, cpubind):
+    try:
+        print("Creating groups in cgroups...")
+        os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}", exist_ok=True)
+
+        # Limit memory usage and CPU
+        cpuquota = int(ncpus) * 100000
+        cgroups_subtree = (f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control")
+        cgroups_cpu_max = (f"echo \"{cpuquota} 100000\" > /sys/fs/cgroup/{CGROUP_NAME}/cpu.max")
+        os.system(cgroups_subtree)
+        os.system(cgroups_cpu_max)
+        if memory:
+            cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
+            os.system(cgroups_memory_max)
+        if disk: 
+            id, throughput = disk
+            throughput_bytes = throughput * 1024 * 1024
+            cgroups_io_max = (f"echo {id} rbps={throughput_bytes} > /sys/fs/cgroup/{CGROUP_NAME}/io.max")
+            os.system(cgroups_io_max)
+        if cpubind:
+            cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus")
+            os.system(cgroups_command)
+
+    except OSError as error:
+        print("Failure, exiting application...")
+        print(error)
+        sys.exit(1)
+
 
 @click.command()
 @click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
 @click.option('--cpubind', required=True, help='Which CPU(s) the application should be executed (numactl).')
 @click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
-@click.option('--app', required=True, prompt='Application', help='The application file you wish to execute.')
+@click.option('--app', type=click.Choice(['stream'], required=True, prompt='Application', help='The application file you wish to execute.')
 @click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
-@click.option('--cpufreq', prompt='Frequency for CPU')    
+@click.option('--cpufreq', is_flag=False, help='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
 @click.option('--llcisolation/--no-llc-isolation', default=False, help='If you want to log the results or not.')
 @click.option('--rapl/--no-rapl', default=False, help='Measure energy using RAPL.')
-
-def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl):
+@click.option('--interf', type=click.Choice(['HT', 'CPU', 'Power', 'LLC', 'Memory', 'Disk']), is_flag=False, help='The interference mode to be executed.')
+def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl, interf):
     """Simple program that runs an application in cgroupsv2 without interference."""
     CGROUP_NAME = uuid.uuid4()
     SUBGROUP_NAME = uuid.uuid1()
+    interf_cores = [] # For compatibility
 
-    # Check requisites (numactl, cpupower)
+    # This data is for the isolation study
+    if interf is not None:
+        interf_cores = [1,3,5,7,9,11,13]
+        ncpus_interf = 
+        memory_interf = memory
+        disk_interf = disk
+        CGROUP_INTERF_NAME = uuid.uuid4()
+        SUBGROUP_NAMECGROUP_INTERF_NAME = uuid.uuid1()
+        if interf == 'CPU':
+            interf_path = "/viruses/CPU/mt-dgemm"
+            matrix_size = 200
+            rep = 100
+   
+    cpu_split = [eval(i) for i in cpubind.split(",")]
+    remainder_cores, interf_cores = get_remaining_cores(cpu_split, interf_cores)
+
+    # Check requisites (numactl, cpupower, intel-cmt-cat)
     sanity_check()
 
     # Check if applications are compiled 
     app_path = app_run(app)
 
     if cpufreq:
-        # Set governor to userspace, set frequencies
+        # Set governor to userspace, set frequencies this is not DVFS processor
         print(f"Setting processor frequencies to {cpufreq}...")
         os.system(f"cpupower frequency-set -g userspace")
         os.system(f"cpupower frequency-set -f {cpufreq}")
@@ -136,49 +181,32 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         print("cgroups v2 is not mounted, trying to mount...")
         mount_cgroup()
     
-    # Create a new directory for cgroups (error if bad)
-    try:
-        print("Creating groups in cgroups...")
-        os.makedirs(f"/sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}", exist_ok=True)
-    except OSError as error:
-        print("Failure, exiting application...")
-        print(error)
-        sys.exit(1)
+    create_cgroups(CGROUP_NAME, SUBGROUP_NAME, ncpus, memory, disk, cpubind)
 
-    # Limit memory usage and CPU
-    cpuquota = int(ncpus) * 100000
-    cgroups_subtree = (f"echo '+cpu +cpuset +memory +io +pids' > /sys/fs/cgroup/cgroup.subtree_control")
-    cgroups_cpu_max = (f"echo \"{cpuquota} 100000\" > /sys/fs/cgroup/{CGROUP_NAME}/cpu.max")
-    os.system(cgroups_subtree)
-    os.system(cgroups_cpu_max)
-    
-    if memory:
-        cgroups_memory_max = (f"echo {memory} > /sys/fs/cgroup/{CGROUP_NAME}/memory.max")
-        os.system(cgroups_memory_max)
-
-    if disk: 
-        id, throughput = disk
-        throughput_bytes = throughput * 1024 * 1024
-        cgroups_io_max = (f"echo {id} rbps={throughput_bytes} > /sys/fs/cgroup/{CGROUP_NAME}/io.max")
-        os.system(cgroups_io_max)
-
-    # Apply CPU pinning if CPUs are provided
-    if cpubind:
-        cgroups_command =  (f"echo {cpubind} > /sys/fs/cgroup/{CGROUP_NAME}/cpuset.cpus")
-        os.system(cgroups_command)
-        app_command = f"numactl --physcpubind={cpubind} {app_path}"
-    else:
-        app_command = app_path
+    if interf is not None:
+        create_cgroups(CGROUP_INTERF_NAME, SUBGROUP_NAMECGROUP_INTERF_NAME, ncpus_interf, memory_interf, disk_interf, cpubind)
     
     if llcisolation:
         print("Isolating application...")
         # Set the COS bitmasks for COS1 using 50% and COS2 using 30% of cache, cores in COS0 uses the remainder
         os.system("pqos -e \"llc:0=0xFC0;llc:1=0x1C0;llc:2=0x003;llc:3=0x003;llc:4=0x003;llc:5=0x003;llc:6=0x003;llc:7=0x003;llc:8=0x003;llc:9=0x003;llc:10=0x003;llc:11=0x003;llc:12=0x003;llc:13=0x003;llc:14=0x003\"")
         # Associate each COS with the cores where each app is running
-        cpu_split = [eval(i) for i in cpubind.split(",")]
-        interf_cores = [24,25,26,27,28,29,30]
-        remainder_cores, interf_cores = get_remaining_cores(cpu_split, interf_cores)
-        os.system(f"pqos -a \"llc:0={cpubind};llc:1={interf_cores};llc:2={remainder_cores}\"")
+        if interf is not None:
+            os.system(f"pqos -a \"llc:0={cpubind};llc:1={interf_cores};llc:2={remainder_cores}\"")
+        else:
+            os.system(f"pqos -a \"llc:0={cpubind};llc:1={remainder_cores}\"")
+
+    # Apply CPU pinning if CPUs are provided
+    if cpubind:
+        app_command = f"numactl --physcpubind={cpubind} {app_path}"
+        if interf is not None:
+            interf_command = f"numactl --physcpubind={interf_cores} {interf_path}"
+    else:
+        app_command = app_path
+
+
+
+    print(f"Running command: {app_command}")
 
     # Run application
     start = time.time()
@@ -187,7 +215,6 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
         socket0_energy_start = read_energy_socket(0)
         socket1_energy_start = read_energy_socket(1)
 
-    print(f"Running command: {app_command}")
     process = run_app_and_pid(app_command)
 
     if process:
@@ -205,10 +232,11 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
     if rapl:
         socket0_energy_end = read_energy_socket(0)
         socket1_energy_end = read_energy_socket(1)
+        energy0 = int(socket0_energy_end) - int(socket0_energy_start)
+        energy1 = int(socket1_energy_end) - int(socket1_energy_start)
+
     print("Finished running application, time = " + str(float(end-start)) + " seconds!")
     exec_time = end - start
-    energy0 = int(socket0_energy_end) - int(socket0_energy_start)
-    energy1 = int(socket1_energy_end) - int(socket1_energy_start)
 
     # Log whatever we need
     if logging:
