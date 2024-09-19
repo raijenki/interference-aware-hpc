@@ -25,8 +25,8 @@ def get_remaining_cores(used_cores):
     # Remaining cores are the difference between all cores and used cores
     remaining_cores = total_cores - used_set
     sorted_cores = sorted(remaining_cores)
-    string_cores = ','.join(map(sorted_cores))
-    print(f"{used_cores} AND {string_cores}") # Sanity check
+    string_cores = ','.join(map(str, sorted_cores))
+    #print(f"{used_cores} AND {string_cores}") # Sanity check
     return string_cores
 
 
@@ -198,7 +198,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl)
 
     # Log whatever we need
     if logging:
-        if os.path.isfile("logs.txt"):
+        if not os.path.isfile("logs.txt"):
             f = open("logs.txt", "w")
             if rapl:
                 f.write("app,runtime,energy0,energy1\n")
