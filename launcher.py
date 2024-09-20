@@ -218,16 +218,18 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
         socket1_energy_start = read_energy_socket(1)
 
     process = run_app_and_pid(app_command)
-    process_interf = run_app_and_pid(interf_command)
+
+    if interf is not None:
+        process_interf = run_app_and_pid(interf_command)
 
     if process:
         pid = process.pid
-        pid_interf = process_interf.pid
         # Put PID into the cgroups process
         cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
         os.system(cgroups_command)
 
         if interf is not None:
+            pid_interf = process_interf.pid
             cgroups_command_interf = (f"echo {pid_interf} > /sys/fs/cgroup/{CGROUP_INTERF_NAME}/{SUBGROUP_INTERF_NAME}/cgroup.procs")
             os.system(cgroups_command_interf)
 
