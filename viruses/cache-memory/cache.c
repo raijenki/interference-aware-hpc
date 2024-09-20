@@ -13,8 +13,8 @@
 #endif
 
 int main() {
-    int *array = malloc(SIZE * sizeof(int));
-    int sum = 0;
+    long long int *array = malloc(SIZE * sizeof(long long int));
+    long long int sum = 0;
     clock_t start, end;
 
     // Initialize the array
@@ -22,16 +22,23 @@ int main() {
         array[i] = i;
     }
 
-    start = clock();
+    // Continuous streaming loop
+    while (1) {
+        start = clock();
 
-    // Access array elements with a large stride, trashing the cache
-    for (int i = 0; i < SIZE; i += STRIDE) {
-        sum += array[i];
+        // Access array elements with a large stride, trashing the cache
+        for (int i = 0; i < SIZE; i += STRIDE) {
+            sum += array[i];
+        }
+
+        end = clock();
+
+        // Print out the results periodically
+        printf("Sum: %lld, Time: %f seconds\n", sum, (double)(end - start) / CLOCKS_PER_SEC);
+
+        // Sleep for 1 second before repeating
+        sleep(1);
     }
-
-    end = clock();
-
-    printf("Sum: %d, Time: %f seconds\n", sum, (double)(end - start) / CLOCKS_PER_SEC);
 
     free(array);
     return 0;

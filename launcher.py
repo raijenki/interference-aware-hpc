@@ -236,6 +236,10 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
         # Wait process to finish
         process.wait()
         print(f"Process {pid} has finished.")
+
+        if interf is not None:
+            process_interf.kill()
+
         process = False
     end = time.time()
     if rapl:
