@@ -155,11 +155,11 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
         memory_interf = memory
         disk_interf = disk
         CGROUP_INTERF_NAME = uuid.uuid4()
-        SUBGROUP_NAMECGROUP_INTERF_NAME = uuid.uuid1()
+        SUBGROUP_INTERF_NAME = uuid.uuid1()
         if interf == 'CPU':
-            matrix_size = 200
-            reps = 100
-            interf_path = "/viruses/CPU/mt-dgemm " + str(matrix_size) + " " + str(reps)
+            matrix_size = 10000
+            reps = 20
+            interf_path = "./viruses/cpu/mt-dgemm " + str(matrix_size) + " " + str(reps)
         else:
             interf_path = "sleep 10"
    
@@ -186,7 +186,7 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
     create_cgroups(CGROUP_NAME, SUBGROUP_NAME, ncpus, memory, disk, cpubind)
 
     if interf is not None:
-        create_cgroups(CGROUP_INTERF_NAME, SUBGROUP_NAMECGROUP_INTERF_NAME, ncpus_interf, memory_interf, disk_interf, cpubind)
+        create_cgroups(CGROUP_INTERF_NAME, SUBGROUP_INTERF_NAME, ncpus_interf, memory_interf, disk_interf, cpubind)
     
     if llcisolation:
         print("Isolating application...")
@@ -222,10 +222,14 @@ def run(ncpus, cpubind, memory, app, disk, cpufreq, logging, llcisolation, rapl,
 
     if process:
         pid = process.pid
-
+        pid_interf = process_interf.pid
         # Put PID into the cgroups process
         cgroups_command = f"echo {pid} > /sys/fs/cgroup/{CGROUP_NAME}/{SUBGROUP_NAME}/cgroup.procs"
         os.system(cgroups_command)
+
+        if interf is not None:
+            cgroups_command_interf = (f"echo {pid_interf} > /sys/fs/cgroup/{CGROUP_INTERF_NAME}/{SUBGROUP_INTERF_NAME}/cgroup.procs")
+            os.system(cgroups_command_interf)
 
         # Wait process to finish
         process.wait()
