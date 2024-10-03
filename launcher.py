@@ -135,7 +135,7 @@ def create_cgroups(CGROUP_NAME, SUBGROUP_NAME, ncpus, memory, disk, cpubind):
 @click.option('--ncpus', required=True, default=0, help='Number of CPUs to be allocated (cgroupv2)')
 @click.option('--cpubind', required=True, help='Which CPU(s) the application should be executed (numactl).')
 @click.option('--memory', required=True, default="1G", help='Allocate amount of memory to the application. (cgroupv2)')
-@click.option('--app', type=click.Choice(['stream']), required=True, prompt='Application', help='The application file you wish to execute.')
+@click.option('--app', type=click.Choice(['stream', 'xsbench']), required=True, prompt='Application', help='The application file you wish to execute.')
 @click.option('--disk', type=(str, int), required=False, help='Disk bandwidth (device, amount of MB/s).')
 @click.option('--cpufreq', is_flag=False, help='Frequency for CPU')    
 @click.option('--logging/--no-logging', default=False, help='If you want to log the results or not.')
