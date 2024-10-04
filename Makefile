@@ -5,7 +5,7 @@ MPICXX = mpicxx
 CFLAGS = -O2 -fopenmp -DOPENMP
 LDFLAGS = -lm
 
-all: stream_c.exe xsbench minife mt-dgemm memory
+all: stream_c.exe xsbench minimd minife hpas
 
 stream_c.exe: 
 	$(CC) $(CFLAGS) -DSTREAM_ARRAY_SIZE=100000000 -DNTIMES=500 apps/stream/stream.c -o apps/stream/stream_c
@@ -16,6 +16,9 @@ mt-dgemm:
 memory:
 	$(CC) $(CFLAGS) -DSIZE=33554432 -DSTRIDE=64 viruses/cache-memory/cache.c -o viruses/cache-memory/cache
 	$(CC) $(CFLAGS) -DSIZE=33554432 -ITER=10000000 viruses/cache-memory/memory.c -o viruses/cache-memory/memory
+
+hpas:
+	cd hpas && ./autogen.sh && ./configure && make 
 
 xsbench: 
 	make -C apps/xsbench XSBench
