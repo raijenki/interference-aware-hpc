@@ -5,7 +5,7 @@ MPICXX = mpicxx
 CFLAGS = -O2 -fopenmp -DOPENMP
 LDFLAGS = -lm
 
-all: stream_c.exe xsbench minimd minife ahpas
+all: stream_c.exe xsbench minimd minife ahpas lulesh
 
 stream_c.exe: 
 	$(CC) $(CFLAGS) -DSTREAM_ARRAY_SIZE=100000000 -DNTIMES=500 apps/stream/stream.c -o apps/stream/stream_c
@@ -19,6 +19,9 @@ memory:
 
 ahpas:
 	cd hpas && ./autogen.sh && ./configure && make 
+
+lulesh:
+	cd apps/lulesh && cmake -DWITH_MPI=OFF -DWITH_OPENMP=ON . && cmake build
 
 xsbench: 
 	make -C apps/xsbench XSBench
